@@ -1,20 +1,10 @@
-/**
- *	@license
- *	Lovetown - Intimate haptics integration for Roguetown's sexcon
- *	Copyright (C) 2025  ComradeNiobe
+/*
+ * @license
+ * @copyright Copyright (C) 2025 Comrade Niobe
  *
- *	This program is free software: you can redistribute it and/or modify
- *	it under the terms of the GNU Affero General Public License as published
- *	by the Free Software Foundation, either version 3 of the License, or
- *	(at your option) any later version.
- *
- *	This program is distributed in the hope that it will be useful,
- *	but WITHOUT ANY WARRANTY; without even the implied warranty of
- *	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *	GNU Affero General Public License for more details.
- *
- *	You should have received a copy of the GNU Affero General Public License
- *	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 import {
@@ -23,63 +13,94 @@ import {
 	type ButtplugClientDevice,
 } from "buttplug";
 
-declare global {
-	function lovetownRuntime(connectAddress: string);
+interface LovetownOptions {
+	/**
+	 * The websocket connection string to the user's Intiface.
+	 */
+	connectAddress: string;
+	/**
+	 * How much time before the device stops.
+	 */
+	timeout: number;
+	/**
+	 * The vibration speed of a vibrator. [0.0 ~ 1.0]
+	 */
+	vibrate?: number | number[];
+	/**
+	 * Causes a device that supports linear movement to move to a position between [0.0 ~ 1.0] over a certain amount of time.
+	 */
+	linear?: number | [number, number][];
+	/**
+	 * Movement time in milliseconds.
+	 */
+	linearDuration?: number;
 }
 
-window.lovetownRuntime = async (connectAddress: string) => {
-	// We construct it into a proper URL in case we want to manipulate it, like for validation and such.
-	const connection_address = new URL(connectAddress);
-	/*
-	 * The ButtplugClient class is our main access to Buttplug Servers, both
-	 * local and remote. This class allows us to connect to servers, query devices
-	 * and send messages to them. It'll wrap a bunch of functionality you may have
-	 * seen in the message spec, including ping handling and message ID tracking.
-	 * Handy!
-	 */
-	const client = new ButtplugClient("Lovetown Client");
-	/*
-	 * The 'deviceadded' event is emitted any time the client is made aware of a device it did not
-	 * know of before. This could mean a new connection, or it could mean that we are being made aware of
-	 * a device that was connected before the client has established contact with the server. Some servers
-	 * persist device connections for various reasons (mostly because Microsoft's BLE API is fucking broken,
-	 * though.).
-	 *
-	 * As we can receive "deviceadded" calls on client connect (when we connect to a server that already has
-	 * devices connected), we set up this event handler before we call connect.
-	 */
-	client.addListener("deviceadded", async (device: ButtplugClientDevice) => {
-		/*
-		 * Here's where we'll make devices vibrate. We get a device object,
-		 * which consists of a device index, device name, and a list of messages the device can take.
-		 * (https://metafetish.github.io/buttplug-js/classes/device.html). If we see something added that
-		 * can vibrate, we'll send a message to start vibrating, then 3 seconds later, a message to stop.
-		 */
-		// To check whether something can vibrate, we currently look for the ScalarCmd message with a Vibrate Actuator
-		// in the allowed messages list. Luckily, the client API makes this easier for us by just giving use "vibrate"
-		// actuators, and handles conversion to ScalarCmd for us.
-		if (device.vibrateAttributes.length > 0) {
-			// Ok, we have a device that vibrates. Let's make it vibrate. We'll put a button that, when clicked, sends
-			// a vibrate message to the server. We'll use the client's SendDeviceMessage
-			// function to do this, with the device object and a new message object. We'll await this, as the
-			// server will let us know when the message has been successfully sent.
-			const sex_action_links =
-				document.querySelectorAll<HTMLAnchorElement>("a.linkOn");
-			for (const sex_action_link of sex_action_links) {
-				sex_action_link.addEventListener("click", async () => {
-					await device.vibrate(1.0);
+declare global {
+	function lovetownSend(
+		connectAddress: string,
+		timeout: number,
+		vibrate?: number,
+		linear?: number | [number, number][],
+		linearDuration?: number,
+	);
+	function lovetownConnect(cxt: LovetownOptions);
+}
 
-					// Now we set a timeout for 3 seconds in the future, to stop the device.
-					setTimeout(async () => {
-						await device.stop();
-					}, 3000);
-				});
+/**
+ * The function that's used to call Lovetown from BYOND winset.
+ * @param connectAddress - The websocket Intiface is running on.
+ * @param timeout - Time until the action ends.
+ * @param vibrate - Optional vibration action from [0.0 ~ 1.0].
+ * @param linear - Optional linear action that can move between [0.0 ~ 1.0].
+ * @param linearDuration - Optional time until the linear action reaches its destination.
+ */
+window.lovetownSend = async (
+	connectAddress: string,
+	timeout: number,
+	vibrate?: number,
+	linear?: number | [number, number][],
+	linearDuration?: number,
+) => {
+	await lovetownConnect({
+		connectAddress,
+		timeout,
+		vibrate,
+		linear,
+		linearDuration,
+	});
+};
+
+window.lovetownConnect = async (cxt: LovetownOptions) => {
+	// We construct it into a proper URL in case we want to manipulate it, like for validation and such.
+	const connection_address = new URL(cxt.connectAddress);
+	const client = new ButtplugClient("Lovetown Client");
+
+	client.addListener("deviceadded", async (device: ButtplugClientDevice) => {
+		if (cxt.vibrate) {
+			if (device.vibrateAttributes.length > 0) {
+				await device.vibrate(cxt.vibrate);
+
+				// Now we set a timeout for 3 seconds in the future, to stop the device.
+				setTimeout(async () => {
+					await device.stop();
+				}, cxt.timeout);
+			}
+		} else if (cxt.linear && cxt.linearDuration) {
+			if (device.linearAttributes.length > 0) {
+				await device.linear(cxt.linear, cxt.linearDuration);
+
+				// Now we set a timeout for 3 seconds in the future, to stop the device.
+				setTimeout(async () => {
+					await device.stop();
+				}, cxt.timeout);
 			}
 		}
 
 		// At this point, let's just say we're done. Ask the server to stop scanning if it is currently doing so.
 		await client.stopScanning();
 	});
+
 	client.addListener(
 		"scanningfinished",
 		async (device: ButtplugClientDevice) => {
@@ -87,34 +108,15 @@ window.lovetownRuntime = async (connectAddress: string) => {
 		},
 	);
 
-	/*
-	 * Now we'll try to connect to a server. Based on the button pushed
-	 * by the user, we'll either try to connect to a remote websocket server,
-	 * or to a local in-browser server.
-	 */
 	try {
-		/*
-		 * Here's how we connect to a remote server. For sake of simplicity, I'm assuming we're running
-		 * a websocket server on the same machine as the web browser we're on. The Intiface Central Websocket
-		 * Server defaults to port 12345, with an endpoint of "buttplug". Since we assume it's on the same
-		 * machine as this browser, we can use ws://.
-		 */
 		const connector = new ButtplugBrowserWebsocketClientConnector(
 			connection_address.toString(),
 		);
 		await client.connect(connector);
 	} catch (e) {
-		// If something goes wrong, we're just logging to the console here. This is a tutorial on a development
-		// website, so we figure the developer has already read the code and knows to look at the console.
-		// At least, we hope.
 		console.log(e);
 		return;
 	}
 
-	/*
-	 * Now we've got a client up and running, we'll need to scan for devices. Calling StartScanning will
-	 * scan on all available busses. Some will scan until told to stop (bluetooth), others will scan once
-	 * and return (gamepads, usb, etc...). When a device is found, a "deviceadded" event is emitted.
-	 */
 	await client.startScanning();
 };

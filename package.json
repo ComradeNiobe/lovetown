@@ -1,7 +1,7 @@
 {
 	"name": "lovetown",
 	"private": true,
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"source": "src/index.ts",
 	"browserslist": "last 3 Edge major versions",
 	"scripts": {
@@ -10,13 +10,13 @@
 		"build-dev": "parcel build --no-optimize"
 	},
 	"author": "ComradeNiobe",
-	"license": "AGPL-3.0-or-later",
+	"license": "MPL-2.0",
 	"packageManager": "pnpm@10.9.0",
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",
 		"buffer": "^6.0.3",
 		"class-transformer": "^0.5.1",
-		"parcel": "^2.14.4"
+		"parcel": "^2.15.1"
 	},
 	"dependencies": {
 		"buttplug": "^3.2.2"
