@@ -1,5 +1,5 @@
 # Lovetown
-Intimate haptics integration for Roguetown's sexcon.
+Intimate haptics integration for adult SS13.
 
 `0.1.0`: Relatively untested, but this update should be considered the first real version of Lovetown. Proper docs will be prepared later down the line, but the essential idea is that you can send commands via DM through `winset`/`output`'s to the Javascript function `lovetownSend` (see its jsdoc for more details).
 
